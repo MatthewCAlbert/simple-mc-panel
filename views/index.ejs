@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft CPanel</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <meta name="robots" content="noindex"/>
+    <meta name="googlebot" content="noindex"/>
+    <style>
+        code{
+            white-space: pre-wrap;
+            text-align: left;
+        }
+        pre{
+            background-color: rgba(0,0,0,0.1);
+            max-height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h1>Minecraft Panel</h1>
+                <p>
+                    Connection Status : <span id="status" class="text-danger">Disconnected</span>
+                </p>
+                <p>
+                    Server Status : <span id="serv-status" class="text-secondary">None</span>
+                </p>
+                <div>
+                    Secret <input type="text" name="secret"/>
+                    <button class="btn btn-secondary" onclick="pressLogin()">Authenticate</button>
+                </div>
+                <strong>!!! Do not spam !!!</strong>
+            </div>
+            <div class="col-12">
+                <pre>
+                    <code>
+                    
+                    </code>
+                </pre>
+            </div>
+            <div class="col-12 btn-server">
+                <button class="btn btn-primary" onclick="getStatus()">Status</button>
+                <button class="btn btn-success btn-action btn-start" onclick="action('start')">Start</button>
+                <button class="btn btn-danger btn-action btn-stop" onclick="action('stop')">Stop</button>
+                <button class="btn btn-warning btn-action btn-restart" onclick="action('restart')">Restart</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        localStorage.setItem('atoken',"");
+        let isServerAlive = false;
+
+        function setConnection(status){
+            if( status === 0 ){
+                $('.btn-server button').prop('disabled', true);
+                $('#status').prop('class', 'text-danger').html('Disconnected');
+            }else{
+                $('button:not(.btn-action)').prop('disabled', false);
+                $('#status').prop('class', 'text-success').html('Connected');
+            }
+        }
+
+        function setServerStatus(status, message = ""){
+            if (status === 0) {
+                $('#serv-status').prop('class', 'text-secondary').html(message);
+                $('.btn-server button.btn-start').prop('disabled', false);
+                $('.btn-server button.btn-stop').prop('disabled', true);
+                $('.btn-server button.btn-restart').prop('disabled', true);
+                isServerAlive = false;
+            } else {
+                $('#serv-status').prop('class', 'text-success').html('Active');
+                $('.btn-server button.btn-start').prop('disabled', true);
+                $('.btn-server button.btn-stop').prop('disabled', false);
+                $('.btn-server button.btn-restart').prop('disabled', false);
+                isServerAlive = true;
+            }
+        }
+
+        function getStatus(){
+            $.ajax({
+                type: "GET",
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('atoken')}`
+                },
+                url: "/status?secret="+$('input[name=secret]').val(),
+                cache: false,
+                success: function (data) {
+                    // $("code").html(JSON.stringify(data, null, 4));
+                    let r = "";
+                    let obj = data;
+                    for(let k in obj ){
+                        r += `<br/><strong>${k}</strong><br/>`+ obj[k];
+                    }
+                    let status = obj.stdout.search(/Active\: active/)
+                    if( status > -1 ){
+                        setServerStatus(1);
+                    }else{
+                      let msg = obj.stdout.match(/Active\: [a-zA-Z]+/)
+                      if( msg ){
+                          msg = msg[0].split(" ")[1]
+                          setServerStatus(0, msg);
+                      }else{
+                          setServerStatus(0, "undefined");
+                      }
+                    }
+                    $("code").html(r);
+                }
+            });
+        }
+        function action(x) {
+            $.ajax({
+                type: "POST",
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('atoken')}`
+                },
+                url: `/${x}`,
+                cache: false,
+                data: {
+                    secret:$('input[name=secret]').val()
+                },
+                success: function (data) {
+                    $("code").text(JSON.stringify(data, null, 4));
+                },
+                error: function (data) {
+                    $("code").text(JSON.stringify(JSON.parse(data.responseText), null, 4));
+                },
+            });
+        }
+        function sData(data){
+            setTimeout(()=>{
+                setConnection(1);
+                localStorage.setItem('atoken', data.token);
+            },3000)
+        }
+        function login(cb) {
+            $.ajax({
+                type: "POST",
+                url: `/login`,
+                cache: false,
+                data: {
+                    username: "admin",
+                    secret: $('input[name=secret]').val()
+                },
+                success: cb
+            });
+        }
+        function pressLogin(){
+            login(sData);
+        }
+        function testStd(){
+            return {
+                "err": null,
+                "stdout": "● minecraft.service - A VPS Minecraft Server Test\n   Loaded: loaded (/etc/systemd/system/minecraft.service; disabled; vendor preset: enabled)\n   Active: active (running) since Wed 2021-02-24 23:50:45 CST; 5 days ago\n Main PID: 2508 (java)\n    Tasks: 22 (limit: 1128)\n   CGroup: /system.slice/minecraft.service\n           └─2508 /usr/bin/java -Xmx1024M -Xms1024M -jar server.jar nogui\n\nMar 02 21:05:03 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:05:03] [Server thread/INFO]: MaximusVid[/118.99.118.150:24470] logged in with entity id 31 at (-425.1762387997051, 73.02442408821369, 1953.5571090700541)\nMar 02 21:05:03 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:05:03] [Server thread/INFO]: MaximusVid joined the game\nMar 02 21:05:04 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:05:04] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 2477ms or 49 ticks behind\nMar 02 21:05:32 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:05:32] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 12441ms or 248 ticks behind\nMar 02 21:05:54 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:05:54] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 7858ms or 157 ticks behind\nMar 02 21:06:54 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:06:54] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 2424ms or 48 ticks behind\nMar 02 21:07:27 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:07:27] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 2006ms or 40 ticks behind\nMar 02 21:07:45 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:07:45] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 3711ms or 74 ticks behind\nMar 02 21:09:00 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:09:00] [Server thread/INFO]: MaximusVid lost connection: Disconnected\nMar 02 21:09:00 iZt4n201lklrt6ktrswjd5Z java[2508]: [21:09:00] [Server thread/INFO]: MaximusVid left the game\n",
+                "stderr": ""
+            }
+        }
+        $('button.btn-action').on('click',(e)=>{
+            $('button.btn-action').prop('disabled', true)
+        })
+        $(document).ready(()=>{
+            $('.btn-server button').prop('disabled',true)
+        })
+</script>
+</body>
+</html>
